@@ -1,0 +1,9 @@
+scenario,planner,violation_pct,in_range_pct,median_closest_m,p10_closest_m,median_arrival_s
+crossing,naive,0.0,100.0,1.71,1.57,3.7
+crossing,robust,0.0,99.0,1.69,1.56,3.6
+oncoming,naive,0.0,100.0,1.56,1.37,3.2
+oncoming,robust,0.0,100.0,1.54,1.37,3.2
+standing,naive,0.0,100.0,1.45,1.33,3.9
+standing,robust,0.0,100.0,1.46,1.34,3.9
+standing_sideways,naive,0.0,100.0,1.42,1.29,4.2
+standing_sideways,robust,0.0,100.0,1.41,1.3,4.3

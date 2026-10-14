@@ -76,19 +76,55 @@ scored against the person's **true** motion.
 The practical reading: for spatiotemporal approach planning, *whether the tracker estimates
 velocity at all* matters far more than how accurate its position is.
 
+## Part 2: does re-planning fix it?
+
+Finding 3 assumes the robot commits to one goal. Real robots re-plan, and a tracker can estimate
+velocity once it has watched the person for a moment. So I closed the loop:
+
+- **Re-planning:** the robot re-chooses its goal every 0.5 s from where it currently is.
+- **Tracker:** reports noisy position (σ 0.1 m) and body orientation (σ 10°) at every step.
+  Velocity is a finite difference of noisy positions and is only reported after a delay.
+- **Two policies while velocity is still missing:**
+  - *naive:* assume the person is standing;
+  - *robust:* average the cost over walking speeds of 0, 0.4, 0.8, 1.2 and 1.5 m/s along the
+    person's facing direction.
+
+**One-shot first** (`src/robust.py`). Planning once over speed hypotheses does not solve it. The
+worst-case version still ends 0.33 m from the oncoming walker. The averaging version keeps both
+walkers safe, but makes the robot stop 2.4 to 2.8 m short of people who really are standing.
+
+**Closed loop with a 1 s velocity delay** (`src/replan.py`, 100 runs per case). Both policies are
+safe in all four scenarios (standing, crossing, oncoming, standing sideways). There are 0
+violations, and the robot ends within conversation range (0.8 to 2.0 m) in 99 to 100% of runs.
+
+**How long can velocity be missing?** (`src/latency_sweep.py`, 80 runs per point.)
+
+![Latency](results/latency.png)
+
+- **Up to 2.5 s of delay, both policies are safe.**
+- **From 3 s, the naive policy degrades for an oncoming walker.** The worst-10% closest distance
+  falls from about 1.3 m to 0.72 m, then 0.62 m at 3.5 s, and 1 of 80 runs enters the intimate
+  zone.
+- **The speed-hypothesis policy holds about half a second longer.** Its worst-10% distance is
+  still 1.24 m at 3 s, and it has no violations up to 3.5 s.
+
+So the failure in finding 3 belongs to the planning architecture, not to the cost function. It
+appears when the robot is close to committing (about 3 s into a 3 s approach here) before it
+knows how the person moves. Cheap insurance is to re-plan, and to plan over plausible walking
+speeds until velocity arrives.
+
 ## Questions this raises
 
-- In a real system, the motion profiles come from a people tracker. Should the personal-space cost
-  grow with the tracker's uncertainty, for example by inflating it with the velocity covariance?
-- How quickly should the goal be re-planned as the person's motion estimate converges? The
-  failure in finding 3 disappears if the velocity estimate arrives before the robot commits.
-- For older adults, whose walking is slower and less steady, is constant-velocity prediction
-  enough, or does the motion profile need a richer gait model?
+- Should the personal-space cost grow with the tracker's velocity uncertainty, rather than
+  switching from "unknown" to "known" in one step?
+- On a real robot with a 2D lidar leg tracker, how long does it take to get a usable velocity, and
+  does that delay ever approach 3 s, for example after occlusion or an identity swap?
+- For older adults, whose gait is slower and less regular, is constant-velocity prediction enough?
 
 ## Limitations
 
-- The robot moves in a straight line at constant speed. There is no full kinodynamic planner and
-  no costmap navigation stack; only the goal choice is studied.
+- The robot moves in a straight line at constant speed toward its current goal. There is no full
+  kinodynamic planner and no nav2 costmap stack; the next step would be a nav2 costmap layer in ROS 2.
 - People move at constant velocity, one person at a time.
 - Tracker noise is independent Gaussian noise, which is optimistic; real trackers drift and swap
   identities.
@@ -99,8 +135,12 @@ velocity at all* matters far more than how accurate its position is.
 Python 3.10+ with numpy, pandas, matplotlib and tabulate.
 
 ```bash
-python src/run_sweep.py results 150   # about 4 minutes
+python src/run_sweep.py results 150        # open-loop noise sweep, about 4 minutes
 python analysis/plots.py results
+python src/robust.py results               # one-shot speed-hypothesis planners
+python src/replan.py results 100           # closed-loop re-planning
+python src/latency_sweep.py results 80     # velocity-latency sweep
+python analysis/plot_latency.py results
 ```
 
 `results/results.csv` has one row per selection: scenario, noise type, level, trial, regret
@@ -111,6 +151,10 @@ python analysis/plots.py results
 ```
 src/approach.py        cost model, goal selection, evaluation against true motion, scenarios
 src/run_sweep.py       noise sweeps and the no-velocity case
+src/robust.py          one-shot planners over walking-speed hypotheses
+src/replan.py          closed-loop simulation with a noisy tracker and delayed velocity
+src/latency_sweep.py   safety as a function of velocity delay
 analysis/plots.py      costmaps, sweep figure, failure figure, summary table
+analysis/plot_latency.py  latency figure
 results/               raw CSV, summary, figures
 ```
