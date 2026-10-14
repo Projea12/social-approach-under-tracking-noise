@@ -1,0 +1,4 @@
+scenario,closest_m_noise_free,viol_%_position_m=0.3,viol_%_heading_deg=35,viol_%_speed_mps=0.35,static_assumption_closest_m
+standing,1.3623509092741075,0.0,0.0,0.0,1.3623509092741075
+crossing,1.6037845710170429,0.0,0.0,0.0,2.2815371316689874
+oncoming,1.6497582964184736,0.0,0.0,0.6666666666666667,0.3513376928943473
